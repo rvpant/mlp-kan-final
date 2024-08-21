@@ -167,7 +167,8 @@ p = 100 # Number of output neurons in both the branch and trunk net.
 
 input_neurons_branch = nx # m
 if modeltype == 'efficient_kan':
-    branch_net = KAN(layers_hidden=[input_neurons_branch] + [100]*6 + [p]) #nn.LeakyReLU() #nn.Tanh()
+    # branch_net = KAN(layers_hidden=[input_neurons_branch] + [100]*6 + [p])
+    branch_net = KAN(layers_hidden=[input_neurons_branch] + [2*input_neurons_branch+1]*1 + [p])
 else:
     branch_net = DenseNet(layersizes=[input_neurons_branch] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
 branch_net.to(device)
@@ -179,7 +180,8 @@ print('#'*100)
 # 2 corresponds to t and x
 input_neurons_trunk = 2
 if modeltype == 'efficient_kan':
-    trunk_net = KAN(layers_hidden=[input_neurons_trunk] + [100]*6 + [p]) 
+    # trunk_net = KAN(layers_hidden=[input_neurons_trunk] + [100]*6 + [p]) 
+    trunk_net = KAN(layers_hidden=[input_neurons_trunk] + [input_neurons_trunk*2+1]*1 + [p]) 
 else:
     trunk_net = DenseNet(layersizes=[input_neurons_trunk] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
 trunk_net.to(device)
