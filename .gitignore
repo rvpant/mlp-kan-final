@@ -1,3 +1,5 @@
 DeepONet_results/*
 KANvsMLP/*.npy
 data/*
+__pycache__/*
+efficient_kan/__pycache__/*
