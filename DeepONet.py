@@ -217,7 +217,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=16000, gamma=1.
 iteration_list, loss_list, learningrates_list = [], [], []
 iteration = 0
 
-n_epochs = 800 # 10 # 2000
+n_epochs = 2000 #800 # 10
 for epoch in range(n_epochs):
     
     # Shuffle the train data using the generated indices
