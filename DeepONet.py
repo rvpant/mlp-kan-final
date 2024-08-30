@@ -18,7 +18,9 @@ from scipy.io import loadmat
 import sys
 sys.path.append("../..")
 from networks import *
-from efficient_kan import *
+import efficient_kan
+import kan
+print("OG KAN import success")
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -33,7 +35,14 @@ warnings.filterwarnings("ignore")
 # %%
 cluster = False
 save = True
-modeltype = "efficient_kan" # "densenet"  #
+
+# model_parser = argparse.ArgumentParser(description='Specify model type.')
+# model_parser.add_argument('-model', dest='modeltype', type=str, default='original_kan',
+#                            help='Model type.', choices=['densenet', 'efficient_kan', 'original_kan'])
+# modeltype = model_parser.parse_args().modeltype
+# print(f"Running with modeltype {modeltype}.")
+
+modeltype = 'original_kan' #"efficient_kan" # "densenet"  
 
 # %%
 if cluster == True:
@@ -141,7 +150,7 @@ class DeepONet(nn.Module):
         
         outputs shape: (bs x neval).
         """
-        
+                
         branch_outputs = self.branch_net(branch_inputs)
         trunk_outputs = self.trunk_net(trunk_inputs)
         
@@ -167,8 +176,10 @@ p = 100 # Number of output neurons in both the branch and trunk net.
 
 input_neurons_branch = nx # m
 if modeltype == 'efficient_kan':
-    # branch_net = KAN(layers_hidden=[input_neurons_branch] + [100]*6 + [p])
-    branch_net = KAN(layers_hidden=[input_neurons_branch] + [2*input_neurons_branch+1]*1 + [p])
+    # branch_net = efficient_kan.KAN(layers_hidden=[input_neurons_branch] + [100]*6 + [p])
+    branch_net = efficient_kan.KAN(layers_hidden=[input_neurons_branch] + [2*input_neurons_branch+1]*1 + [p])
+elif modeltype == 'original_kan':
+    branch_net = kan.KAN(width=[input_neurons_branch,2*input_neurons_branch+1,p], grid=5, k=3, seed=0)
 else:
     branch_net = DenseNet(layersizes=[input_neurons_branch] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
 branch_net.to(device)
@@ -179,11 +190,14 @@ print('#'*100)
 
 # 2 corresponds to t and x
 input_neurons_trunk = 2
-if modeltype == 'efficient_kan':
-    # trunk_net = KAN(layers_hidden=[input_neurons_trunk] + [100]*6 + [p]) 
-    trunk_net = KAN(layers_hidden=[input_neurons_trunk] + [input_neurons_trunk*2+1]*1 + [p]) 
-else:
-    trunk_net = DenseNet(layersizes=[input_neurons_trunk] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
+trunk_net = DenseNet(layersizes=[input_neurons_trunk] + [100]*6 + [p], activation=nn.SiLU())
+# if modeltype == 'efficient_kan':
+#     # trunk_net = efficient_kan.KAN(layers_hidden=[input_neurons_trunk] + [100]*6 + [p]) 
+#     trunk_net = efficient_kan.KAN(layers_hidden=[input_neurons_trunk] + [input_neurons_trunk*2+1]*1 + [p]) 
+# elif modeltype == 'original_kan':
+#     trunk_net = kan.KAN(width=[input_neurons_trunk,2*input_neurons_trunk+1,p], grid=5, k=3, seed=0)
+# else:
+#     trunk_net = DenseNet(layersizes=[input_neurons_trunk] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
 trunk_net.to(device)
 # print(trunk_net)
 print('TRUNK-NET SUMMARY:')
@@ -217,7 +231,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=16000, gamma=1.
 iteration_list, loss_list, learningrates_list = [], [], []
 iteration = 0
 
-n_epochs = 2000 #800 # 10
+n_epochs = 100 #2000 # 10  #800
 for epoch in range(n_epochs):
     
     # Shuffle the train data using the generated indices
@@ -273,9 +287,9 @@ for epoch in range(n_epochs):
         iteration+=1
     
 if save == True:
-    np.save(os.path.join(resultdir,'iteration_list.npy'), np.asarray(iteration_list))
-    np.save(os.path.join(resultdir,'loss_list.npy'), np.asarray(loss_list))
-    np.save(os.path.join(resultdir,'learningrates_list.npy'), np.asarray(learningrates_list))
+    np.save(os.path.join(resultdir, f'iteration_list_{modeltype}.npy'), np.asarray(iteration_list))
+    np.save(os.path.join(resultdir, f'loss_list_{modeltype}.npy'), np.asarray(loss_list))
+    np.save(os.path.join(resultdir, f'learningrates_list_{modeltype}.npy'), np.asarray(learningrates_list))
     
 plt.figure()
 plt.plot(iteration_list, loss_list, 'g', label = 'training loss')
@@ -285,7 +299,7 @@ plt.ylabel('Training loss')
 plt.legend()
 plt.tight_layout()
 if save == True:
-    plt.savefig(os.path.join(resultdir,'loss_plot.pdf'))
+    plt.savefig(os.path.join(resultdir, f'loss_plot_{modeltype}.jpg'))
 
 plt.figure()
 plt.plot(iteration_list, learningrates_list, 'b', label = 'learning-rate')
@@ -294,84 +308,91 @@ plt.ylabel('Learning-rate')
 plt.legend()
 plt.tight_layout()
 if save == True:
-    plt.savefig(os.path.join(resultdir,'learning-rate_plot.pdf'))
+    plt.savefig(os.path.join(resultdir, f'learning-rate_plot_{modeltype}.jpg'))
     
 # end timer
 finish = time.time() - start  # time for network to train
 
 # %%
 if save == True:
-    torch.save(model.state_dict(), os.path.join(resultdir,'model_state_dict.pt'))
+    torch.save(model.state_dict(), os.path.join(resultdir, f'model_state_dict_{modeltype}.pt'))
 # model.load_state_dict(torch.load(os.path.join(resultdir,'model_state_dict.pt')))
 
 # %%
 # Predictions
-# mse_list = []
+mse_list = []
 
-# for i in range(inputs_test.shape[0]):
+for i in range(inputs_test.shape[0]):
     
-#     branch_inputs = inputs_test[i].reshape(1, nx) # (bs, m) = (1, nx) 
-#     trunk_inputs = grid # (neval, 2) = (nt*nx, 2)
+    branch_inputs = inputs_test[i].reshape(1, nx) # (bs, m) = (1, nx) 
+    trunk_inputs = grid # (neval, 2) = (nt*nx, 2)
 
-#     prediction_i = model(branch_inputs, trunk_inputs).cpu() # (bs, neval) = (1, nt*nx)
-#     target_i = outputs_test[i].reshape(1, -1).cpu()
-#     mse_i = F.mse_loss(prediction_i, target_i)
-#     mse_list.append(mse_i.item())
+    prediction_i = model(branch_inputs, trunk_inputs).cpu() # (bs, neval) = (1, nt*nx)
+    target_i = outputs_test[i].reshape(1, -1).cpu()
+    mse_i = F.mse_loss(prediction_i, target_i)
+    mse_list.append(mse_i.item())
     
 
-#     if (i+1) % 10 == 0:
-#         print(colored('TEST SAMPLE '+str(i+1), 'red'))
+    if (i+1) % 10 == 0:
+        print(colored('TEST SAMPLE '+str(i+1), 'red'))
         
-#         r2score = metrics.r2_score(outputs_test[i].flatten().cpu().detach().numpy(), prediction_i.flatten().cpu().detach().numpy()) 
-#         relerror = np.linalg.norm(outputs_test[i].flatten().cpu().detach().numpy() - prediction_i.flatten().cpu().detach().numpy()) / np.linalg.norm(outputs_test[i].flatten().cpu().detach().numpy())
-#         r2score = float('%.4f'%r2score)
-#         relerror = float('%.4f'%relerror)
-#         print('Rel. L2 Error = '+str(relerror)+', R2 score = '+str(r2score))
+        r2score = metrics.r2_score(outputs_test[i].flatten().cpu().detach().numpy(), prediction_i.flatten().cpu().detach().numpy()) 
+        relerror = np.linalg.norm(outputs_test[i].flatten().cpu().detach().numpy() - prediction_i.flatten().cpu().detach().numpy()) / np.linalg.norm(outputs_test[i].flatten().cpu().detach().numpy())
+        r2score = float('%.4f'%r2score)
+        relerror = float('%.4f'%relerror)
+        print('Rel. L2 Error = '+str(relerror)+', R2 score = '+str(r2score))
         
-#         fig = plt.figure(figsize=(15,4))
-#         plt.subplots_adjust(left = 0.1, bottom = 0.1, right = 0.9, top = 0.5, wspace = 0.4, hspace = 0.1)
+        fig = plt.figure(figsize=(15,4))
+        plt.subplots_adjust(left = 0.1, bottom = 0.1, right = 0.9, top = 0.5, wspace = 0.4, hspace = 0.1)
         
-#         ax = fig.add_subplot(1, 4, 1)    
-#         ax.plot(x_span.cpu().detach().numpy(), inputs_test[i].cpu().detach().numpy())
-#         ax.set_xlabel(r'$x$')
-#         ax.set_ylabel(r'$s(t=0, x)$')
-#         plt.tight_layout()
+        ax = fig.add_subplot(1, 4, 1)    
+        ax.plot(x_span.cpu().detach().numpy(), inputs_test[i].cpu().detach().numpy())
+        ax.set_xlabel(r'$x$')
+        ax.set_ylabel(r'$s(t=0, x)$')
+        plt.tight_layout()
         
-#         ax = fig.add_subplot(1, 4, 2)  
-#         plt.pcolor(X.cpu().detach().numpy(), T.cpu().detach().numpy(), outputs_test[i].cpu().detach().numpy(), cmap='jet')
-#         plt.colorbar()
-#         ax.set_xlabel(r'$x$')
-#         ax.set_ylabel(r'$t$')
-#         plt.title('$True \ field$',fontsize=14)
-#         plt.tight_layout()
+        ax = fig.add_subplot(1, 4, 2)  
+        plt.pcolor(X.cpu().detach().numpy(), T.cpu().detach().numpy(), outputs_test[i].cpu().detach().numpy(), cmap='jet')
+        plt.colorbar()
+        ax.set_xlabel(r'$x$')
+        ax.set_ylabel(r'$t$')
+        plt.title('$True \ field$',fontsize=14)
+        plt.tight_layout()
 
-#         ax = fig.add_subplot(1, 4, 3)  
-#         plt.pcolor(X.cpu().detach().numpy(), T.cpu().detach().numpy(), prediction_i.reshape(nt, nx).cpu().detach().numpy(), cmap='jet')
-#         plt.colorbar()
-#         ax.set_xlabel(r'$x$')
-#         ax.set_ylabel(r'$t$')
-#         plt.title('$Predicted \ field$',fontsize=14)  
-#         plt.tight_layout()
+        ax = fig.add_subplot(1, 4, 3)  
+        plt.pcolor(X.cpu().detach().numpy(), T.cpu().detach().numpy(), prediction_i.reshape(nt, nx).cpu().detach().numpy(), cmap='jet')
+        plt.colorbar()
+        ax.set_xlabel(r'$x$')
+        ax.set_ylabel(r'$t$')
+        plt.title('$Predicted \ field$',fontsize=14)  
+        plt.tight_layout()
         
-#         ax = fig.add_subplot(1, 4, 4)  
-#         plt.pcolor(X.cpu().detach().numpy(), T.cpu().detach().numpy(), np.abs(outputs_test[i].cpu().detach().numpy() - prediction_i.reshape(nt, nx).cpu().detach().numpy()), cmap='jet')
-#         plt.colorbar()
-#         ax.set_xlabel(r'$x$')
-#         ax.set_ylabel(r'$t$')
-#         plt.title('$Absolute \ error$',fontsize=14)  
-#         plt.tight_layout()
+        ax = fig.add_subplot(1, 4, 4)  
+        plt.pcolor(X.cpu().detach().numpy(), T.cpu().detach().numpy(), np.abs(outputs_test[i].cpu().detach().numpy() - prediction_i.reshape(nt, nx).cpu().detach().numpy()), cmap='jet')
+        plt.colorbar()
+        ax.set_xlabel(r'$x$')
+        ax.set_ylabel(r'$t$')
+        plt.title('$Absolute \ error$',fontsize=14)  
+        plt.tight_layout()
 
-#         if save == True:
-#             plt.savefig(os.path.join(resultdir,'Test_Sample_'+str(i+1)+'.pdf'))
-#             plt.show()
-#             plt.close()
-#         if save == False:
-#             plt.show()
+        if save == True:
+            plt.savefig(os.path.join(resultdir,'Test_Sample_'+str(i+1)+'.pdf'))
+            plt.show()
+            plt.close()
+        if save == False:
+            plt.show()
 
-#         print(colored('#'*230, 'green'))
+        print(colored('#'*230, 'green'))
 
-# mse = sum(mse_list) / len(mse_list)
-# print("Mean Squared Error Test:\n", mse)
+mse = sum(mse_list) / len(mse_list)
+print("Mean Squared Error Test:\n", mse)
+
+# %%
+if modeltype == 'original_kan':
+    print('##################################################')
+    print("Visualizing the trained KAN branch and trunk nets.")
+    branch_net.plot()
+    trunk_net.plot()
 
 # %%
 print("Time (sec) to complete:\n" +str(finish)) # time for network to train
