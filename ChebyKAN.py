@@ -11,8 +11,6 @@
 import torch
 import torch.nn as nn
 
-
-
 # This is inspired by Kolmogorov-Arnold Networks but using Chebyshev polynomials instead of splines coefficients
 class ChebyKANLayer(nn.Module):
     def __init__(self, input_dim, output_dim, degree):

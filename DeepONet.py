@@ -20,7 +20,7 @@ sys.path.append("../..")
 from networks import *
 import efficient_kan
 import kan
-print("OG KAN import success")
+from ChebyKAN import GeneralChebyKAN
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -42,7 +42,7 @@ save = True
 # modeltype = model_parser.parse_args().modeltype
 # print(f"Running with modeltype {modeltype}.")
 
-modeltype = 'original_kan' #"efficient_kan" # "densenet"  
+modeltype = 'cheby_kan' #'original_kan' #"efficient_kan" # "densenet"  
 
 # %%
 if cluster == True:
@@ -150,7 +150,7 @@ class DeepONet(nn.Module):
         
         outputs shape: (bs x neval).
         """
-                
+        
         branch_outputs = self.branch_net(branch_inputs)
         trunk_outputs = self.trunk_net(trunk_inputs)
         
@@ -180,6 +180,8 @@ if modeltype == 'efficient_kan':
     branch_net = efficient_kan.KAN(layers_hidden=[input_neurons_branch] + [2*input_neurons_branch+1]*1 + [p])
 elif modeltype == 'original_kan':
     branch_net = kan.KAN(width=[input_neurons_branch,2*input_neurons_branch+1,p], grid=5, k=3, seed=0)
+elif modeltype == 'cheby_kan':
+    branch_net = GeneralChebyKAN(layer_dims=[input_neurons_branch,2*input_neurons_branch+1,p], degree=4)
 else:
     branch_net = DenseNet(layersizes=[input_neurons_branch] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
 branch_net.to(device)
@@ -188,22 +190,26 @@ print('BRANCH-NET SUMMARY:')
 # summary(branch_net, input_size=(input_neurons_branch,))  
 print('#'*100)
 
+# %%
+
 # 2 corresponds to t and x
 input_neurons_trunk = 2
-trunk_net = DenseNet(layersizes=[input_neurons_trunk] + [100]*6 + [p], activation=nn.SiLU())
-# if modeltype == 'efficient_kan':
-#     # trunk_net = efficient_kan.KAN(layers_hidden=[input_neurons_trunk] + [100]*6 + [p]) 
-#     trunk_net = efficient_kan.KAN(layers_hidden=[input_neurons_trunk] + [input_neurons_trunk*2+1]*1 + [p]) 
-# elif modeltype == 'original_kan':
-#     trunk_net = kan.KAN(width=[input_neurons_trunk,2*input_neurons_trunk+1,p], grid=5, k=3, seed=0)
-# else:
-#     trunk_net = DenseNet(layersizes=[input_neurons_trunk] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
+if modeltype == 'efficient_kan':
+    # trunk_net = efficient_kan.KAN(layers_hidden=[input_neurons_trunk] + [100]*6 + [p]) 
+    trunk_net = efficient_kan.KAN(layers_hidden=[input_neurons_trunk] + [input_neurons_trunk*2+1]*1 + [p]) 
+elif modeltype == 'original_kan':
+    trunk_net = kan.KAN(width=[input_neurons_trunk,2*input_neurons_trunk+1,p], grid=5, k=3, seed=0)
+elif modeltype == 'cheby_kan':
+    trunk_net = GeneralChebyKAN(layer_dims=[input_neurons_trunk,2*input_neurons_trunk+1,p], degree=4)
+else:
+    trunk_net = DenseNet(layersizes=[input_neurons_trunk] + [100]*6 + [p], activation=nn.SiLU()) #nn.LeakyReLU() #nn.Tanh()
 trunk_net.to(device)
 # print(trunk_net)
 print('TRUNK-NET SUMMARY:')
 # summary(trunk_net, input_size=(input_neurons_trunk,))
 print('#'*100)
 
+# %%
 model = DeepONet(branch_net, trunk_net)
 model.to(device)
 
@@ -231,7 +237,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=16000, gamma=1.
 iteration_list, loss_list, learningrates_list = [], [], []
 iteration = 0
 
-n_epochs = 100 #2000 # 10  #800
+n_epochs = 2000 #100 # 10  #800
 for epoch in range(n_epochs):
     
     # Shuffle the train data using the generated indices
