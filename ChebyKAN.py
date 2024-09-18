@@ -1,4 +1,4 @@
-## XLi: code originally from https://github.com/SynodicMonth/ChebyKAN.git
+## code roiginally from https://github.com/SynodicMonth/ChebyKAN.git
 ## I slightly modified the original code in order for it to work on our problem beyond the MNIST set
 ## Several things we may need to play with in order to find the optimal setup for our problems, listed below
 ## 1. see if activation other than cos and acos should be used for best performance
@@ -10,6 +10,8 @@
 
 import torch
 import torch.nn as nn
+
+
 
 # This is inspired by Kolmogorov-Arnold Networks but using Chebyshev polynomials instead of splines coefficients
 class ChebyKANLayer(nn.Module):
@@ -45,11 +47,12 @@ class ChebyKANLayer(nn.Module):
         return y
         
 class GeneralChebyKAN(nn.Module):
-    def __init__(self, layer_dims, degree = 4):
+    def __init__(self, layer_dims, degree = 4, norm=False):
         """
         layer_dims: List of integers representing the dimensions of each layer.
                     e.g., [input_dim, hidden_dim1, hidden_dim2, ..., output_dim]
         degree: Degree of the Chebyshev polynomials.
+        norm: whether or not to include layer normalization.
         """
         # do we need LayerNorm at all?
         super(GeneralChebyKAN, self).__init__()
@@ -58,7 +61,7 @@ class GeneralChebyKAN(nn.Module):
 
         for i in range(len(layer_dims) - 1):
             self.layers.append(ChebyKANLayer(layer_dims[i], layer_dims[i + 1], degree))
-            if i < len(layer_dims) - 2: 
+            if norm and (i < len(layer_dims) - 2): 
                 self.norm_layers.append(nn.LayerNorm(layer_dims[i + 1]))
 
     def forward(self, x):

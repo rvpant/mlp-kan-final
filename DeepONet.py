@@ -42,8 +42,7 @@ save = True
 # modeltype = model_parser.parse_args().modeltype
 # print(f"Running with modeltype {modeltype}.")
 
-modeltype = 'cheby_kan' #'original_kan' #"efficient_kan" # "densenet"  
-
+modeltype = 'cheby_kan' #'original_kan' # # "densenet"  "efficient_kan"# 
 # %%
 if cluster == True:
     parser = argparse.ArgumentParser()
