@@ -1,12 +1,3 @@
-## code oiginally from https://github.com/SpaceLearner/JacobiKAN.git
-## I slightly modified the original code in order for it to work on our problem beyond the MNIST set
-## Several things we may need to play with in order to find the optimal setup for our problems, listed below
-## 1. see if activation other than tanh should be used for best performance
-## 2. not sure if we still need to do LayerNorm for our problems, I'd suggest try having it and then remove it, see which one is better
-## 3. play a little bit with the polynomial degree and see which works best, I am setting it to 4 now but no reason that is gonna work
-## 4. other changes you can think of if needed, such as changing the values for a,b......
-
-
 import torch
 import torch.nn as nn
 import numpy as np
